@@ -1,6 +1,6 @@
 import { MongoClient, ServerApiVersion } from "mongodb";
 
-const mongoUri = "MONGO_SRV=mongodb+srv://eohenhen:XG8Zg5OnvTdG3Oru@cluster0.wmsduqf.mongodb.net/?retryWrites=true&w=majority";
+const mongoUri = "mongodb+srv://eohenhen:XG8Zg5OnvTdG3Oru@cluster0.wmsduqf.mongodb.net/?retryWrites=true&w=majority";
 if (!mongoUri) {
   throw new Error("Please add the MongoDB connection SRV as 'MONGO_SRV'");
 }
