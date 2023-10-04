@@ -96,6 +96,49 @@ class Routes {
     return await User.idsToUsernames(await Friend.getFriends(user));
   }
 
+  @Router.get("/favorites")
+  async getFavorites(session: WebSessionDoc) {
+  }
+  @Router.get("/invites")
+  async getInvitations(session: WebSessionDoc) {
+  }
+  @Router.post("/invites/:to")
+  async sendInvites(session: WebSessionDoc, to: string) {
+    
+  }
+  @Router.delete("/favorites/:favorite")
+  async removeFavorite(session: WebSessionDoc, favorite: string) {
+  
+  }
+  
+  @Router.get("/collages")
+  async getCollages(author?:String) {
+    
+  }
+  @Router.get("/comments")
+  async getComments(author?:String) {
+    
+  }
+  @Router.get("/profiles")
+  async getProfiles(author?:String) {
+    
+  }
+  @Router.get("/spaces")
+  async getSpaces(author?:String) {
+    
+  }
+  @Router.get("/messages")
+  async getMessages(author?:String) {
+    
+  }
+  @Router.get("/swipestack")
+  async getSwipeStack(author?:String) {
+    
+  }
+  @Router.get("/flair")
+  async getFlair(author?:String) {
+    
+  }
   @Router.delete("/friends/:friend")
   async removeFriend(session: WebSessionDoc, friend: string) {
     const user = WebSession.getUser(session);
