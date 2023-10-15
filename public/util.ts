@@ -153,7 +153,68 @@ const operations: operation[] = [
     fields: { item_id: "input", item_type: 'input' },
   },
   //space actions
+  {
+    name: "Create Space",
+    endpoint: "/api/spaces",
+    method: "POST",
+    fields: { name: "input" },
+  },
+  {
+    name: "Get Space (only input one or none(to get all))",
+    endpoint: "/api/spaces",
+    method: "GET",
+    fields: { id: "input" , user_id: "input", username:"input"},
+  },
+  
+  {
+    name: "Delete Space",
+    endpoint: "/api/spaces/:id",
+    method: "DELETE",
+    fields: { id: "input" },
+  },
+  {
+    name: "Join Space",
+    endpoint: "/api/spaces/:id",
+    method: "POST",
+    fields: { id: "input" },
+  },
+  {
+    name: "Leave Space",
+    endpoint: "/api/spaces/:id",
+    method: "POST",
+    fields: { id: "input" },
+  },
+  {
+    name: "Add Item ('post'/'collage') to Space",
+    endpoint: "/api/spaces/:id",
+    method: "POST",
+    fields: { id: "input", item_id:"input", item_type:"input"},
+  },
+  {
+    name: "Remove Item ('post'/'collage') from Space",
+    endpoint: "/api/spaces/:id",
+    method: "DELETE",
+    fields: { id: "input", item_id:"input", item_type:"input"},
+  },
   //comments actions 
+  {
+    name: "Create Comment",
+    endpoint: "/api/comments",
+    method: "POST",
+    fields: {  content_id: "input", target_id:"input" },
+  },
+  {
+    name: "Get Comment (only input one or none(to get all))",
+    endpoint: "/api/comments",
+    method: "GET",
+    fields: { username: "input" , target_id:"input"},
+  },
+  {
+    name: "Delete Comment",
+    endpoint: "/api/comments/:id",
+    method: "DELETE",
+    fields: { id: "input" },
+  },
   
 ];
 

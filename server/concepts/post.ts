@@ -19,7 +19,7 @@ export interface PostDoc extends BaseDoc {
   content: ObjectId;
   flair: FlairType; 
 }
-
+//TODO add captions 
 export default class PostConcept {
   public readonly posts = new DocCollection<PostDoc>("posts");
 
