@@ -2,8 +2,19 @@ import { ObjectId } from "mongodb";
 
 import { Router, getExpressRouter } from "./framework/router";
 
-import { Friend, Post, User, WebSession } from "./app";
-import { PostDoc, PostOptions } from "./concepts/post";
+import {
+  Collage,
+  CollageFavorite,
+  Comment,
+  Media,
+  Post,
+  PostFavorite,
+  Space,
+  SpaceFavorite,
+  User, UserFavorite, WebSession
+} from "./app";
+import { NotAllowedError } from "./concepts/errors";
+import { FlairType, InvalidPostFlairError } from "./concepts/post";
 import { UserDoc } from "./concepts/user";
 import { WebSessionDoc } from "./concepts/websession";
 import Responses from "./responses";
@@ -56,7 +67,103 @@ class Routes {
     WebSession.end(session);
     return { msg: "Logged out!" };
   }
+  
+  //favorite routes
+  @Router.get("/favorites/:item_id")
+  async getFavorites(item_id: ObjectId, item_type: string) {
+    if(item_id){
+      if (item_type.toLowerCase() === "user"){
+        return await UserFavorite.getFavorites(item_id);
+      }else if (item_type.toLowerCase() === "space"){
+        return await SpaceFavorite.getFavorites(item_id);
+      }else if (item_type.toLowerCase() === "collage"){
+        return await CollageFavorite.getFavorites(item_id);
+      }else if (item_type.toLowerCase() === "post"){
+        return await PostFavorite.getFavorites(item_id);
+      }else{
+        throw new NotAllowedError(`${item_type} is not an allowed favorite item type. Allowed item types are "user",
+      "collage","space", and "post".`);
 
+      }
+    }else{
+      throw new NotAllowedError('must provide item id');//idkTODO
+    }
+  }
+  @Router.post("/favorites/:item_id")
+  async createFavorite(session: WebSessionDoc, item_id: ObjectId, item_type:string) {
+    //console.log("here in create favorite")
+    const user = WebSession.getUser(session);
+    
+      if (item_type.toLowerCase() === "user"){
+        return await UserFavorite.addFavorite(user, item_id);
+      }else if (item_type.toLowerCase() === "space"){
+        return await SpaceFavorite.addFavorite(user, item_id);
+      }else if (item_type.toLowerCase() === "collage"){
+        return await CollageFavorite.addFavorite(user,item_id);
+      }else{
+        throw new NotAllowedError(`${item_type} is not an allowed favorite item type. Allowed item types are "user",
+      "collage","space".`);
+
+      }
+    
+    
+    
+    //for a favorite do I return the add like a Friend or return a msg & post like a post 
+    //what's the difference between the two
+    //return { msg: created.msg, post: await Responses.post(created.post) };
+  }
+  //different router for posts because they go into a collage when favorited.
+  @Router.post("/favorites/:post_id/collage/:collage_id")
+  async favoritePost(session: WebSessionDoc, item_id: ObjectId, collage_id: ObjectId) {
+    const user = WebSession.getUser(session);
+    await Collage.addContent(collage_id, item_id); 
+    return await PostFavorite.addFavorite(user, item_id);
+
+
+  }
+  @Router.delete("/favorites/:_id")
+  async deleteFavorite(session: WebSessionDoc, _id: ObjectId, item_type:string) {
+    const user = WebSession.getUser(session);
+    if (item_type.toLowerCase() === "user"){
+      await UserFavorite.isFavorited(user, _id);
+      return await UserFavorite.addFavorite(user, _id);
+    }else if (item_type.toLowerCase() === "space"){
+      await SpaceFavorite.isFavorited(user, _id);
+      return await SpaceFavorite.addFavorite(user, _id);
+    }else if (item_type.toLowerCase() === "collage"){
+      await CollageFavorite.isFavorited(user, _id);
+      return await CollageFavorite.addFavorite(user,_id);
+    }else{
+      throw new NotAllowedError(`${item_type} is not an allowed favorite item type. Allowed item types are "user",
+    "collage","space".`);
+
+    }
+    
+  }
+  @Router.delete("/favorites/:_id/collages/collage_id")
+  async unfavoritePost(session: WebSessionDoc, _id: ObjectId, collage_id:ObjectId) {
+    const user = WebSession.getUser(session);
+    await PostFavorite.isFavorited(user, _id);
+    await Collage.isEditor(user,collage_id);
+    const deleted = await Collage.deleteContent(collage_id, _id); 
+    const unfavorited = PostFavorite.removeFavorite(user,_id);
+    return {collage_msg: deleted.msg, collage:deleted.collage, favorite_msg:unfavorited};
+  }
+
+
+  //post routes 
+  @Router.post("/posts/:content_id/flair/:flair")
+  async createPost(session: WebSessionDoc, content_id:ObjectId,flair:FlairType) {
+    if(!Object.keys(FlairType).includes(flair.toString())){
+      throw new InvalidPostFlairError(flair.toString(),Object.keys(FlairType));
+    }
+    const user = WebSession.getUser(session);
+    
+    const created = await Post.create(user, content_id,flair);
+    return { msg: created.msg, post: created.post };
+
+  }
+  //TODO add support for getting by flair and id 
   @Router.get("/posts")
   async getPosts(author?: string) {
     let posts;
@@ -68,21 +175,14 @@ class Routes {
     }
     return Responses.posts(posts);
   }
-
-  @Router.post("/posts")
-  async createPost(session: WebSessionDoc, content: string, options?: PostOptions) {
-    const user = WebSession.getUser(session);
-    const created = await Post.create(user, content, options);
-    return { msg: created.msg, post: await Responses.post(created.post) };
-  }
-
-  @Router.patch("/posts/:_id")
-  async updatePost(session: WebSessionDoc, _id: ObjectId, update: Partial<PostDoc>) {
-    const user = WebSession.getUser(session);
-    await Post.isAuthor(user, _id);
-    return await Post.update(_id, update);
-  }
-
+  //TODO I dont want to update posts 
+  // @Router.patch("/posts/:_id")
+  // async updatePost(session: WebSessionDoc, _id: ObjectId, update: Partial<PostDoc>) {
+  //   const user = WebSession.getUser(session);
+  //   await Post.isAuthor(user, _id);
+  //   return await Post.update(_id, update);
+  // }
+  //how to delete posts from posts and groups can I just call the group router in posts
   @Router.delete("/posts/:_id")
   async deletePost(session: WebSessionDoc, _id: ObjectId) {
     const user = WebSession.getUser(session);
@@ -90,95 +190,334 @@ class Routes {
     return Post.delete(_id);
   }
 
-  @Router.get("/friends")
-  async getFriends(session: WebSessionDoc) {
+  //media routes 
+  @Router.post("/media")
+  async uploadMedia(session: WebSessionDoc, content: string) {
+    
     const user = WebSession.getUser(session);
-    return await User.idsToUsernames(await Friend.getFriends(user));
+    const upload = await Media.upload(user, content);
+    return { msg: upload.msg, post: upload.media };
+   
   }
-
-  @Router.get("/favorites")
-  async getFavorites(session: WebSessionDoc) {
+  @Router.get("/media/:_id")
+  async getMedia(_id:ObjectId) {
+    return await Media.getMedia(_id);
+   
   }
-  @Router.get("/invites")
-  async getInvitations(session: WebSessionDoc) {
-  }
-  @Router.post("/invites/:to")
-  async sendInvites(session: WebSessionDoc, to: string) {
+  @Router.delete("/media/:_id")
+  async deleteMedia(session:WebSessionDoc, _id:ObjectId) {
+    const user = WebSession.getUser(session);
+    await Media.isAuthor(user,_id);
+    return await Media.delete(_id);
     
   }
-  @Router.delete("/favorites/:favorite")
-  async removeFavorite(session: WebSessionDoc, favorite: string) {
-  
+
+  //collage routes 
+  @Router.post("/collages")
+  async createCollage(session: WebSessionDoc,name:string) {
+    
+    const user = WebSession.getUser(session);
+    
+    const created = await Collage.create(user,name, [],[user]);
+    return { msg: created.msg, collage: created.collage };
+
   }
-  
+
   @Router.get("/collages")
-  async getCollages(author?:String) {
+  async getCollage(_id?:ObjectId, user_id?: ObjectId,username?: string) {
+    
+    if (_id) {
+      return await Collage.getCollages({id:_id});
+    } else if (user_id){
+      return await Collage.getCollages({author:user_id}); 
+    } else if (username){
+      const id = (await User.getUserByUsername(username))._id;
+      return await Collage.getCollages({author:id}); 
+    }
+    else {
+      return await Collage.getCollages({});
+    }
+    //return Responses.posts(posts);
+
+  }
+
+  @Router.delete("/collages/:_id")
+  async deleteCollage(session:WebSessionDoc,_id:ObjectId) {
+    const user = WebSession.getUser(session);
+    await Collage.isAuthor(user,_id);
+    return await Collage.delete(_id);
+  }
+  //CHECK idk if it is patch or post 
+  @Router.post("/collages/:_id")
+  async addContent(session:WebSessionDoc,_id:ObjectId, content_id:ObjectId) {
+    
+    const user = WebSession.getUser(session);
+    await Collage.isEditor(user, _id);
+    const added = await Collage.addContent(_id, content_id);
+    return { msg: added.msg, collage: added.collage };
+
+  }
+  @Router.delete("/collages/:_id")
+  async deleteContent(session:WebSessionDoc,_id:ObjectId, content_id:ObjectId) {
+    
+    const user = WebSession.getUser(session);
+    await Collage.isEditor(user, _id);
+    const added = await Collage.deleteContent(_id, content_id);
+    return { msg: added.msg, collage: added.collage };
+
     
   }
-  @Router.get("/comments")
-  async getComments(author?:String) {
+  @Router.post("/collages/:_id")
+  async addEditor(session:WebSessionDoc,_id:ObjectId, editor_id:ObjectId) {
     
+    const user = WebSession.getUser(session);
+    await Collage.isEditor(user, _id);
+    const added = await Collage.addEditor(_id, editor_id);
+    return { msg: added.msg, collage: added.collage };
+
   }
-  @Router.get("/profiles")
-  async getProfiles(author?:String) {
+  
+  //space routes 
+  @Router.post("/spaces")
+  async createSpaces(session: WebSessionDoc,name:string, picture?:ObjectId, bio?:string) {
     
+    const user = WebSession.getUser(session);
+    
+    const created = await Space.create(user,name, [user], [], [],picture, bio);
+    return { msg: created.msg, space: created.space };
+
   }
+
   @Router.get("/spaces")
-  async getSpaces(author?:String) {
+  async getSpace(_id?:ObjectId, user_id?: ObjectId,username?: string) {
+    
+    if (_id) {
+      return await Space.getSpaces({id:_id});
+    } else if (user_id){
+      return await Space.getSpaces({author:user_id}); 
+    } else if (username){
+      const id = (await User.getUserByUsername(username))._id;
+      return await Space.getSpaces({author:id}); 
+    }
+    else {
+      return await Space.getSpaces({});
+    }
+   
+  }
+
+  @Router.delete("/spaces/:_id")
+  async deleteSpace(session:WebSessionDoc,_id:ObjectId) {
+    const user = WebSession.getUser(session);
+    await Space.isAuthor(user,_id);
+    return await Space.delete(_id);
+  }
+  //CHECK idk if it is patch or post 
+  @Router.post("/spaces/:_id")
+  async joinSpace(session:WebSessionDoc,_id:ObjectId) {
+    
+    const user = WebSession.getUser(session);
+    await Space.isNotInSpace( _id,user, "user");
+    const added = await Space.addItem(_id, user, "user");
+    return { msg: added.msg, space: added.space };
+
+  }
+  @Router.delete("/spaces/:_id")
+  async leaveSpace(session:WebSessionDoc,_id:ObjectId) {
+    
+    const user = WebSession.getUser(session);
+    await Space.isMember(user, _id);
+    const added = await Space.deleteItem(_id, user, "user");
+    return { msg: added.msg, space: added.space };
+
     
   }
-  @Router.get("/messages")
-  async getMessages(author?:String) {
+  @Router.post("/spaces/:_id")
+  async addSpaceItem(session:WebSessionDoc,_id:ObjectId, item_id:ObjectId, item_type:string) {
     
+    const user = WebSession.getUser(session);
+    await Space.isMember(user, _id);
+    const added = await Space.addItem(_id, item_id, item_type);
+    return { msg: added.msg, space: added.space };
+
   }
-  @Router.get("/swipestack")
-  async getSwipeStack(author?:String) {
+  @Router.delete("/spaces/:_id")
+  async deleteSpaceItem(session:WebSessionDoc,_id:ObjectId, item_id:ObjectId, item_type:string) {
     
+    const user = WebSession.getUser(session);
+    await Space.isMember(user, _id);
+    const maybePost = await Post.getById(item_id);
+    //posts should only be removed by 
+    if (maybePost.length === 1){
+      const isAuthor = (Post.isAuthor(user, item_id) || Space.isAuthor(user,_id))
+      if(!isAuthor){
+        throw new NotAllowedError('Not the author of post or of the space');
+      }
+    }
+    const added = await Space.deleteItem(_id, item_id, item_type);
+    return { msg: added.msg, space: added.space };
   }
-  @Router.get("/flair")
-  async getFlair(author?:String) {
+
+  //comment routes 
+  @Router.post("/comments")
+  async createComment(session: WebSessionDoc, content_id:ObjectId, target_id: ObjectId) {
+    const user = WebSession.getUser(session);
     
-  }
-  @Router.delete("/friends/:friend")
-  async removeFriend(session: WebSessionDoc, friend: string) {
-    const user = WebSession.getUser(session);
-    const friendId = (await User.getUserByUsername(friend))._id;
-    return await Friend.removeFriend(user, friendId);
-  }
+    const created = await Comment.create(user, content_id, target_id);
+    return { msg: created.msg, comment: created.comment };
 
-  @Router.get("/friend/requests")
-  async getRequests(session: WebSessionDoc) {
-    const user = WebSession.getUser(session);
-    return await Responses.friendRequests(await Friend.getRequests(user));
   }
+  //TODO add support for getting by flair and id 
+  @Router.get("/comments")
+  async getComment(author?: string, target?:ObjectId) {
+    
+    if (author) {
+      const id = (await User.getUserByUsername(author))._id;
+      return await Comment.getByAuthor(id);
+    }else if (target){
+      return await Comment.getByTarget(target); 
+    } else {
+      return await Comment.getComments({});
+    }
+  }
+  //TODO I dont want to update posts 
+  // @Router.patch("/posts/:_id")
+  // async updatePost(session: WebSessionDoc, _id: ObjectId, update: Partial<PostDoc>) {
+  //   const user = WebSession.getUser(session);
+  //   await Post.isAuthor(user, _id);
+  //   return await Post.update(_id, update);
+  // }
+  //how to delete posts from posts and groups can I just call the group router in posts
+  @Router.delete("/comments/:_id")
+  async deleteComment(session: WebSessionDoc, _id: ObjectId) {
+    const user = WebSession.getUser(session);
+    await Comment.isAuthor(user, _id);
+    return Comment.delete(_id);
+  }
+  
 
-  @Router.post("/friend/requests/:to")
-  async sendFriendRequest(session: WebSessionDoc, to: string) {
-    const user = WebSession.getUser(session);
-    const toId = (await User.getUserByUsername(to))._id;
-    return await Friend.sendRequest(user, toId);
-  }
+    // @Router.post("/collages/:flair")
+    // async addToCollage(session: WebSessionDoc,name:string, flair:FlairType) {
+    //   if(!Object.keys(FlairType).includes(flair.toString())){
+    //     throw new InvalidPostFlairError(flair.toString(),Object.keys(FlairType));
+    //   }
+    //   const user = WebSession.getUser(session);
+      
+    //   const created = await Collage.create(user,name, flair, [],[]);
+    //   return { msg: created.msg, collage: await created.collage };
+  
+    //   }
+    
+  
+    // if (upload.media){
+    //   const created = await Post.create(user, upload.media._id, flair);
+    //   return { msg: created.msg, post: await Responses.post(created.post) };
 
-  @Router.delete("/friend/requests/:to")
-  async removeFriendRequest(session: WebSessionDoc, to: string) {
-    const user = WebSession.getUser(session);
-    const toId = (await User.getUserByUsername(to))._id;
-    return await Friend.removeRequest(user, toId);
-  }
+    // }else{
+    //   throw new MediaUploadFailureError(user,content);
+    // }
+    
+  
+  // @Router.post("/media/image")
+  // async uploadImage(session: WebSessionDoc, content: string) {
+  //   const user = WebSession.getUser(session);
+  //   const created = await ImageMedia.upload(user, content);
+  //   return { msg: created.msg, media: await created.media };
+  // }
+  // @Router.post("/media/")
+  // async uploadVideo(session: WebSessionDoc, content: string) {
+  //   const user = WebSession.getUser(session);
+  //   const created = await ImageMedia.upload(user, content);
+  //   return { msg: created.msg, media: await created.media };
+  // }
 
-  @Router.put("/friend/accept/:from")
-  async acceptFriendRequest(session: WebSessionDoc, from: string) {
-    const user = WebSession.getUser(session);
-    const fromId = (await User.getUserByUsername(from))._id;
-    return await Friend.acceptRequest(fromId, user);
-  }
+ 
+  // @Router.get("/friends/")
+  // async getFriends(session: WebSessionDoc) {
+  //   const user = WebSession.getUser(session);
+  //   return await User.idsToUsernames(await Friend.getFriends(user));
+  // }
 
-  @Router.put("/friend/reject/:from")
-  async rejectFriendRequest(session: WebSessionDoc, from: string) {
-    const user = WebSession.getUser(session);
-    const fromId = (await User.getUserByUsername(from))._id;
-    return await Friend.rejectRequest(fromId, user);
-  }
+  
+  // @Router.get("/invites")
+  // async getInvitations(session: WebSessionDoc) {
+  // }
+  // @Router.post("/invites/:to")
+  // async sendInvites(session: WebSessionDoc, to: string) {
+    
+  // }
+  // // @Router.delete("/favorites/:favorite")
+  // // async removeFavorite(session: WebSessionDoc, favorite: string) {
+  
+  // // }
+  
+  // @Router.get("/collages")
+  // async getCollages(author?:String) {
+    
+  // }
+  // @Router.get("/comments")
+  // async getComments(author?:String) {
+    
+  // }
+  // @Router.get("/profiles")
+  // async getProfiles(author?:String) {
+    
+  // }
+  // @Router.get("/spaces")
+  // async getSpaces(author?:String) {
+    
+  // }
+  // @Router.get("/messages")
+  // async getMessages(author?:String) {
+    
+  // }
+  // @Router.get("/swipestack")
+  // async getSwipeStack(author?:String) {
+    
+  // }
+  // @Router.get("/flair")
+  // async getFlair(author?:String) {
+    
+  // }
+  // @Router.delete("/friends/:friend")
+  // async removeFriend(session: WebSessionDoc, friend: string) {
+  //   const user = WebSession.getUser(session);
+  //   const friendId = (await User.getUserByUsername(friend))._id;
+  //   return await Friend.removeFriend(user, friendId);
+  // }
+
+  // @Router.get("/friend/requests")
+  // async getRequests(session: WebSessionDoc) {
+  //   const user = WebSession.getUser(session);
+  //   return await Responses.friendRequests(await Friend.getRequests(user));
+  // }
+
+  // @Router.post("/friend/requests/:to")
+  // async sendFriendRequest(session: WebSessionDoc, to: string) {
+  //   const user = WebSession.getUser(session);
+  //   const toId = (await User.getUserByUsername(to))._id;
+  //   return await Friend.sendRequest(user, toId);
+  // }
+
+  // @Router.delete("/friend/requests/:to")
+  // async removeFriendRequest(session: WebSessionDoc, to: string) {
+  //   const user = WebSession.getUser(session);
+  //   const toId = (await User.getUserByUsername(to))._id;
+  //   return await Friend.removeRequest(user, toId);
+  // }
+
+  // @Router.put("/friend/accept/:from")
+  // async acceptFriendRequest(session: WebSessionDoc, from: string) {
+  //   const user = WebSession.getUser(session);
+  //   const fromId = (await User.getUserByUsername(from))._id;
+  //   return await Friend.acceptRequest(fromId, user);
+  // }
+
+  // @Router.put("/friend/reject/:from")
+  // async rejectFriendRequest(session: WebSessionDoc, from: string) {
+  //   const user = WebSession.getUser(session);
+  //   const fromId = (await User.getUserByUsername(from))._id;
+  //   return await Friend.rejectRequest(fromId, user);
+  // }
 }
 
 export default getExpressRouter(new Routes());

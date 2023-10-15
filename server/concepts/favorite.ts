@@ -9,9 +9,10 @@ export interface FavoriteDoc extends BaseDoc {
 
 
 export default class FavoriteConcept {
-  public readonly favorites = new DocCollection<FavoriteDoc>("favorites");
-  //public readonly requests = new DocCollection<FriendRequestDoc>("friendRequests");
-
+  public readonly favorites:DocCollection<FavoriteDoc>;
+  constructor(name: string){
+    this.favorites = new DocCollection<FavoriteDoc>(name);
+}
   async removeFavorite(sender: ObjectId, receiver: ObjectId) {
     const favorite = await this.favorites.popOne(
         { sender: sender, receiver: receiver });
@@ -29,21 +30,41 @@ export default class FavoriteConcept {
     return favorites.map((favorite) => (favorite.sender.toString() === item.toString() ? favorite.receiver : favorite.sender));
   }
 
-  private async addFavorite(sender: ObjectId, receiver: ObjectId) {
-    void this.favorites.createOne({ sender, receiver });
+  async addFavorite(sender: ObjectId, receiver: ObjectId) {
+    await this.isNotFavorited(sender, receiver);
+    const _id = await this.favorites.createOne({ sender, receiver });
+    return { msg: "Favorite successfully created!", favorite: await this.favorites.readOne({_id}) };
+  }
+  async isFavorited(sender: ObjectId, reciever: ObjectId) {
+    const favorite = await this.favorites.readOne(
+
+        { sender: sender, receiver: reciever }
+    );
+    if (!favorite) {
+        throw new NotFoundError(`${sender} hasn't favorited ${reciever}!`);
+      }
+      if (favorite.sender.toString() !== sender.toString()) {
+        throw new FavoriteSenderNotMatchError(sender, reciever);
+    }
+    if (favorite !== null || sender.toString() === reciever.toString()) {
+      throw new AlreadyFavoritedError(sender, reciever);
+    }
   }
 
   
-
   private async isNotFavorited(sender: ObjectId, reciever: ObjectId) {
     const favorite = await this.favorites.readOne(
 
         { sender: sender, receiver: reciever }
     );
-    if (favorite !== null || sender.toString() === reciever.toString()) {
-      throw new AlreadyFavoritedError(sender, reciever);
+    console.log(`sender is ${sender} and reciever is ${reciever}and${favorite!== null} and`)
+    if (favorite !== null){
+        if (sender.toString() === reciever.toString()) {
+            throw new AlreadyFavoritedError(sender, reciever);
+        }
     }
   }
+  
 }
   
 
@@ -65,3 +86,13 @@ export class AlreadyFavoritedError extends NotAllowedError {
     super("{0} has already favorited {1}!", sender, receiver);
   }
 }
+//?? IDK what would ever trigger this do I need it 
+export class FavoriteSenderNotMatchError extends NotAllowedError {
+    constructor(
+      public readonly sender: ObjectId,
+      public readonly reciever: ObjectId,
+    ) {
+      super("{0} is not the favoriter of {1}!", sender, reciever);
+    }
+  }
+  

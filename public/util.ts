@@ -53,30 +53,108 @@ const operations: operation[] = [
     method: "GET",
     fields: { username: "input" },
   },
+  //media actions
   {
-    name: "Get Posts (empty for all)",
-    endpoint: "/api/posts",
-    method: "GET",
-    fields: { author: "input" },
-  },
-  {
-    name: "Create Post",
-    endpoint: "/api/posts",
+    name: "Upload Media (Media Type must be 'image', 'video', or 'text') ",
+    endpoint: "/api/media",
     method: "POST",
-    fields: { content: "input" },
+    fields: { content: "input", media_type: "input" },
   },
-  {
-    name: "Update Post",
-    endpoint: "/api/posts/:id",
-    method: "PATCH",
-    fields: { id: "input", update: { content: "input", options: { backgroundColor: "input" } } },
-  },
+  //post functions
+
+  //update the post caption (later)
+
+  // {
+  //   name: "Update Post",
+  //   endpoint: "/api/posts/:id",
+  //   method: "PATCH",
+  //   fields: { id: "input", update: { content: "input", options: { backgroundColor: "input" } } },
+  // },
   {
     name: "Delete Post",
     endpoint: "/api/posts/:id",
     method: "DELETE",
     fields: { id: "input" },
   },
+  {
+    name: "Create Post(Must provide a flair. Defined flairs are (case sensitive): 'Tip', 'Artwork', 'Inspo', 'General'",
+    endpoint: "/api/posts/:content_id/flair/:flair",
+    method: "POST",
+    fields: { content_id: "input", flair: "input" },
+  },
+  
+  {
+    name: "Get Posts (either input author, flair or id)",
+    endpoint: "/api/posts",
+    method: "GET",
+    fields: { author: "input" , flair: "input", id:"input"},
+  },
+  
+  //collage actions
+  {
+    name: "Create Collage",
+    endpoint: "/api/collages",
+    method: "POST",
+    fields: { name: "input" },
+  },
+  {
+    name: "Get Collage (only input one or none(to get all))",
+    endpoint: "/api/collages",
+    method: "GET",
+    fields: { id: "input" , user_id: "input", username:"input"},
+  },
+  {
+    name: "Delete Collage",
+    endpoint: "/api/collages/:id",
+    method: "DELETE",
+    fields: { id: "input" },
+  },
+  {
+    name: "Add Content (Post) to Collage",
+    endpoint: "/api/collages/:id",
+    method: "POST",
+    fields: { id: "input", content_id:"input" },
+  },
+  {
+    name: "Remove Content (Post) from Collage",
+    endpoint: "/api/collages/:id",
+    method: "DELETE",
+    fields: { id: "input", content_id:"input" },
+  },
+  //favorite actions
+  {
+    name: "Create Favorite from Post",
+    endpoint: "/favorites/:post_id/collage/:collage_id",
+    method: "POST",
+    fields: { post_id: "input", collage_id: "input" },
+  },
+  {
+    name: "Create Favorite (Other Item: 'user', 'space', 'collage')",
+    endpoint: "/favorites/:item_id",
+    method: "POST",
+    fields: { item_id: "input", item_type: "input" },
+  },
+  {
+    name: "Delete Favorite from Post",
+    endpoint: "/favorites/:_id/collage/:collage_id",
+    method: "POST",
+    fields: { _id: "input", collage_id: "input" },
+  },
+  {
+    name: "Delete Favorite (Other Item: 'user', 'space', 'collage')",
+    endpoint: "/favorites/:_id",
+    method: "POST",
+    fields: { _id: "input", item_type: "input" },
+  },
+  {
+    name: "Get Favorite (item types: 'user', 'space', 'collage', 'post')",
+    endpoint: "/api/favorites/:item_id",
+    method: "GET",
+    fields: { item_id: "input", item_type: 'input' },
+  },
+  //space actions
+  //comments actions 
+  
 ];
 
 // Do not edit below here.
