@@ -18,13 +18,14 @@ export interface PostDoc extends BaseDoc {
   author: ObjectId;
   content: ObjectId;
   flair: FlairType; 
+  caption?:string;
 }
 //TODO add captions 
 export default class PostConcept {
   public readonly posts = new DocCollection<PostDoc>("posts");
 
-  async create(author: ObjectId, content: ObjectId, flair:FlairType) {
-    const _id = await this.posts.createOne({ author, content, flair});
+  async create(author: ObjectId, content: ObjectId, flair:FlairType, caption?:string) {
+    const _id = await this.posts.createOne({ author, content, flair, caption});
     return { msg: "Post successfully created!", post: await this.posts.readOne({ _id }) };
   }
 
@@ -72,7 +73,7 @@ export default class PostConcept {
 
   private sanitizeUpdate(update: Partial<PostDoc>) {
     // Make sure the update cannot change the author.
-    const allowedUpdates = ["content", "flair"];
+    const allowedUpdates = ["content", "flair", "caption"];
     for (const key in update) {
       if (!allowedUpdates.includes(key)) {
         throw new NotAllowedError(`Cannot update '${key}' field!`);

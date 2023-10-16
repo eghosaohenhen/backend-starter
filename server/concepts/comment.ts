@@ -27,10 +27,10 @@ export default class CommentConcept {
   }
 
   async getByAuthor(author: ObjectId) {
-    return await this.getComments({ author });
+    return await this.getComments({ author:author });
   }
   async getByTarget(target: ObjectId) {
-    return await this.getComments({ target});
+    return await this.getComments({ target:target});
   }
 
   async update(_id: ObjectId, update: Partial<CommentDoc>) {

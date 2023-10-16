@@ -26,7 +26,6 @@ export default class FavoriteConcept {
     const favorites = await this.favorites.readMany(
       { receiver: item });
     // Making sure to compare ObjectId using toString()
-    //lowkey could remove ternary but o well 
     return favorites.map((favorite) => (favorite.sender.toString() === item.toString() ? favorite.receiver : favorite.sender));
   }
 
@@ -37,7 +36,6 @@ export default class FavoriteConcept {
   }
   async isFavorited(sender: ObjectId, reciever: ObjectId) {
     const favorite = await this.favorites.readOne(
-
         { sender: sender, receiver: reciever }
     );
     if (!favorite) {
@@ -57,7 +55,7 @@ export default class FavoriteConcept {
 
         { sender: sender, receiver: reciever }
     );
-    console.log(`sender is ${sender} and reciever is ${reciever}and${favorite!== null} and`)
+    console.log(`sender is ${sender} and reciever is ${reciever}and${favorite!== null}`)
     if (favorite !== null){
         if (sender.toString() === reciever.toString()) {
             throw new AlreadyFavoritedError(sender, reciever);

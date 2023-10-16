@@ -1,4 +1,4 @@
-import { ObjectId } from "mongodb";
+import { Filter, ObjectId } from "mongodb";
 import DocCollection, { BaseDoc } from "../framework/doc";
 import { NotAllowedError, NotFoundError } from "./errors";
 
@@ -11,7 +11,6 @@ export interface MediaDoc extends BaseDoc {
 
 export default class MediaConcept {
     public readonly medias:DocCollection<MediaDoc>;
-    //public readonly requests = new DocCollection<FriendRequestDoc>("friendRequests");
     constructor(name: string){
         this.medias = new DocCollection<MediaDoc>(name);
     }
@@ -19,9 +18,15 @@ export default class MediaConcept {
         const _id = await this.medias.createOne({ author, content});
         return { msg: "Media successfully uploaded!", media: await this.medias.readOne({ _id }) };
     }
-    async getMedia(_id: ObjectId) {
+    async getMediaById(_id: ObjectId) {
         
         return await this.medias.readOne({ _id });
+    }
+    async getMedia(query: Filter<MediaDoc>) {
+        const medias = await this.medias.readMany(query, {
+          sort: { dateUpdated: -1 },
+        });
+        return medias;
     }
     async delete(_id: ObjectId) {
         await this.medias.deleteOne({ _id });

@@ -2,7 +2,6 @@ import { Filter, ObjectId } from "mongodb";
 
 import DocCollection, { BaseDoc } from "../framework/doc";
 import { BadValuesError, NotAllowedError, NotFoundError } from "./errors";
-import { FlairType } from "./post";
 
 // export interface CollageOptions {
 //   backgroundColor?: string;
@@ -12,8 +11,7 @@ import { FlairType } from "./post";
 //make content like an optional parameter in the routes like give it a default empty Set
 export interface CollageDoc extends BaseDoc {
   author: ObjectId;
-  name:string; 
-  flair: FlairType; 
+  name:string;
   content: Array<ObjectId>;
   editors:Array<ObjectId>;
   
@@ -119,10 +117,30 @@ export default class CollageConcept {
     return { msg: "Successfully added editor to collage!", collage: await this.collages.readOne({ _id }) };
     
   }
+  async removeEditor(_id: ObjectId,editor:ObjectId) {
+    const collage = await this.collages.readOne({ _id });
+    if (!collage) {
+        throw new NotFoundError(`Collage ${_id} does not exist!`);
+    }
+    await this.isEditor(_id,editor);
+    let index = -1;
+    for (let i = 0; i < collage.editors.length; i++){
+        if(collage.editors[i].toString() === editor.toString()){
+            index = i;
+        }
+    }
+    
+    collage.editors.splice(index, 1);
+    await this.collages.updateOne({ _id }, collage);
+    return { msg: "Successfully removed editor from collage!", collage: await this.collages.readOne({ _id }) };
+    
+  }
   
   async getByAuthor(author: ObjectId) {
     return await this.getCollages({ author });
   }
+  
+
 
   async update(_id: ObjectId, update: Partial<CollageDoc>) {
     

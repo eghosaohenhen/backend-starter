@@ -7,8 +7,8 @@ import { NotAllowedError, NotFoundError } from "./errors";
 export interface SpaceDoc extends BaseDoc {
   author: ObjectId;
   name: string;
-  url: string;
   members: Array<ObjectId>;
+  featured_collage:ObjectId;
   picture?: ObjectId; 
   bio?: string;
   posts:Array<ObjectId>; 
@@ -18,9 +18,9 @@ export interface SpaceDoc extends BaseDoc {
 export default class SpaceConcept {
   public readonly spaces = new DocCollection<SpaceDoc>("spaces");
 
-  async create(author: ObjectId, name: string, members: Array<ObjectId>, posts: Array<ObjectId>, collages:Array<ObjectId>,picture?:ObjectId, bio?:string) {
+  async create(author: ObjectId, name: string, members: Array<ObjectId>, posts: Array<ObjectId>, featured_collage:ObjectId,collages:Array<ObjectId>,picture?:ObjectId, bio?:string) {
     await this.isSpaceNameUnique(name);
-    const _id = await this.spaces.createOne({ author, name, members, posts,collages,picture, bio});
+    const _id = await this.spaces.createOne({ author, name, members, posts,featured_collage, collages, picture, bio});
     return { msg: "Space successfully created!", space: await this.spaces.readOne({ _id }) };
   }
 
@@ -30,18 +30,52 @@ export default class SpaceConcept {
     });
     return spaces;
   }
-  async isNotInSpace(_id:ObjectId, item: ObjectId, item_type: string){
-    const space = await this.spaces.readOne({ _id });
+  async getSpaceBySpacename(name:string){
+    const space = await this.spaces.readOne({ name:name });
+    if (space === null) {
+      throw new NotFoundError(`Space ${name} not found!`);
+    }
+    return space;
+    
+  }
+//   async updateFeaturedCollage(_id:ObjectId, new_collage:ObjectId){
+//     const space = await this.spaces.readOne({ _id });
+//     if (!space) {
+//         throw new NotFoundError(`Space ${_id} does not exist!`);
+//     }
+//     const isInSpace:boolean = space.collages.toString().includes(new_collage.toString());
+//     if (!isInSpace) {
+//       throw new NotAllowedError(`Space ${space.name} doesn't have ${new_collage}`);
+//     }
+//     //const isInSpace = await this.spaces.
+//     //const space = await this.spaces.readOne({ featured_collage: new_collage });
+//     await this.spaces.updateOne({ _id }, {featured_collage:new_collage});
+//     // if (space === null) {
+//     //   throw new NotFoundError(`Space ${name} not found!`);
+//     // }
+//     return { msg: `Successfully added ${new_collage} to space!`, space: await this.spaces.readOne({ _id }) };
+    
+  //}
+  async isNotInSpace(_id:ObjectId, item: ObjectId, item_type: string, space?:SpaceDoc){
+    let new_space;
     if (!space) {
-        throw new NotFoundError(`Space ${_id} does not exist!`);
+        new_space = await this.spaces.readOne({ _id });
+        if (!new_space) {
+            throw new NotFoundError(`Space ${_id} does not exist!`);
+        }
+        
+    }
+    const used_space = space? space: new_space;
+    if (!used_space){
+        throw new NotFoundError(`Space ${_id} does not exist (aliasing error)!`);
     }
     let item_array;
     if (item_type === "user"){
-        item_array = space.members;
+        item_array = used_space.members;
     }else if (item_type === "post"){
-        item_array = space.posts;
+        item_array = used_space.posts;
     }else if (item_type === "collage"){
-        item_array = space.collages;
+        item_array = used_space.collages;
     }else{
         throw new NotAllowedError(`Item type must be either "user", "post", or "collage"!`);
     }
@@ -49,7 +83,7 @@ export default class SpaceConcept {
     const hasItem:boolean = item_array.toString().includes(item.toString());
     
     if (hasItem){
-        throw new NotFoundError(`${item} is already an item in space ${space.name}`);
+        throw new NotFoundError(`${item} is already an ${item_type} in space ${used_space.name}`);
     }
     return item_array;
   }
@@ -59,7 +93,7 @@ export default class SpaceConcept {
     if (!space) {
         throw new NotFoundError(`Space ${_id} does not exist!`);
     }
-    const item_array = await this.isNotInSpace(_id,item,item_type);
+    const item_array = await this.isNotInSpace(_id,item,item_type,space);
     item_array.push(item);
     
     await this.spaces.updateOne({ _id }, space);
@@ -86,8 +120,11 @@ export default class SpaceConcept {
             index = i;
         }
     }
+    
     item_array.splice(index, 1);
-    return {msg:"Post deleted from space successfully!", space: await this.spaces.readOne({ _id })}; 
+   
+    await this.spaces.updateOne({ _id }, space);
+    return {msg:`${item_type} ${member} deleted from space successfully!`, space: await this.spaces.readOne({ _id })}; 
   }
 
   async getByMember(member: ObjectId) {
@@ -132,7 +169,7 @@ export default class SpaceConcept {
   }
   private sanitizeUpdate(update: Partial<SpaceDoc>) {
     // Make sure the update cannot change the author.
-    const allowedUpdates = ["content", "options"];
+    const allowedUpdates = ["picture", "bio", "members", "featured_collage"];
     for (const key in update) {
       if (!allowedUpdates.includes(key)) {
         throw new NotAllowedError(`Cannot update '${key}' field!`);

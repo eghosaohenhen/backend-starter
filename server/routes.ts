@@ -13,8 +13,10 @@ import {
   SpaceFavorite,
   User, UserFavorite, WebSession
 } from "./app";
-import { NotAllowedError } from "./concepts/errors";
+import { CommentDoc } from "./concepts/comment";
+import { NotAllowedError, NotFoundError } from "./concepts/errors";
 import { FlairType, InvalidPostFlairError } from "./concepts/post";
+import { SpaceDoc } from "./concepts/space";
 import { UserDoc } from "./concepts/user";
 import { WebSessionDoc } from "./concepts/websession";
 import Responses from "./responses";
@@ -113,7 +115,7 @@ class Routes {
     //return { msg: created.msg, post: await Responses.post(created.post) };
   }
   //different router for posts because they go into a collage when favorited.
-  @Router.post("/favorites/:post_id/collage/:collage_id")
+  @Router.post("/favorites/:post_id/collages/:collage_id")
   async favoritePost(session: WebSessionDoc, item_id: ObjectId, collage_id: ObjectId) {
     const user = WebSession.getUser(session);
     await Collage.addContent(collage_id, item_id); 
@@ -140,7 +142,7 @@ class Routes {
     }
     
   }
-  @Router.delete("/favorites/:_id/collages/collage_id")
+  @Router.delete("/favorites/:_id/collages/:collage_id")
   async unfavoritePost(session: WebSessionDoc, _id: ObjectId, collage_id:ObjectId) {
     const user = WebSession.getUser(session);
     await PostFavorite.isFavorited(user, _id);
@@ -152,25 +154,31 @@ class Routes {
 
 
   //post routes 
-  @Router.post("/posts/:content_id/flair/:flair")
-  async createPost(session: WebSessionDoc, content_id:ObjectId,flair:FlairType) {
+  @Router.post("/posts/:content_id")
+  async createPost(session: WebSessionDoc, content_id:ObjectId,flair:FlairType, caption?:string) {
     if(!Object.keys(FlairType).includes(flair.toString())){
       throw new InvalidPostFlairError(flair.toString(),Object.keys(FlairType));
     }
     const user = WebSession.getUser(session);
     
-    const created = await Post.create(user, content_id,flair);
+    const created = caption?await Post.create(user, content_id,flair,caption):await Post.create(user, content_id,flair);
     return { msg: created.msg, post: created.post };
 
   }
-  //TODO add support for getting by flair and id 
   @Router.get("/posts")
-  async getPosts(author?: string) {
+  async getPosts(author?: string, flair?: FlairType, _id?: ObjectId) {
     let posts;
     if (author) {
       const id = (await User.getUserByUsername(author))._id;
       posts = await Post.getByAuthor(id);
-    } else {
+    } else if (flair){
+      if(!Object.keys(FlairType).includes(flair.toString())){
+        throw new InvalidPostFlairError(flair.toString(),Object.keys(FlairType));
+      }
+      posts = await Post.getPosts({flair:flair});
+    }else if (_id){
+      posts = await Post.getPosts({id:_id});
+    }else {
       posts = await Post.getPosts({});
     }
     return Responses.posts(posts);
@@ -199,12 +207,18 @@ class Routes {
     return { msg: upload.msg, post: upload.media };
    
   }
-  @Router.get("/media/:_id")
-  async getMedia(_id:ObjectId) {
-    return await Media.getMedia(_id);
-   
+  @Router.get("/media")
+  async getMedia(_id?:ObjectId,username?:string ) {
+    if (_id){
+      return await Media.getMediaById(_id);
+    } else if (username){
+      const user = await User.getUserByUsername(username);
+      return await Media.getMedia({author:user});
+    } else {
+      return await Media.getMedia({});
+    }
   }
-  @Router.delete("/media/:_id")
+  @Router.delete("/media")
   async deleteMedia(session:WebSessionDoc, _id:ObjectId) {
     const user = WebSession.getUser(session);
     await Media.isAuthor(user,_id);
@@ -224,14 +238,17 @@ class Routes {
   }
 
   @Router.get("/collages")
-  async getCollage(_id?:ObjectId, user_id?: ObjectId,username?: string) {
+  async getCollage(_id?:ObjectId, editorname?: string,authorname?: string) {
     
     if (_id) {
       return await Collage.getCollages({id:_id});
-    } else if (user_id){
-      return await Collage.getCollages({author:user_id}); 
-    } else if (username){
-      const id = (await User.getUserByUsername(username))._id;
+    } else if (editorname){
+      //$in?
+      //$or: [{ from: user }, { to: user }],
+      const id = (await User.getUserByUsername(editorname))._id;
+      return await Collage.getCollages({editors:id}); 
+    } else if (authorname){
+      const id = (await User.getUserByUsername(authorname))._id;
       return await Collage.getCollages({author:id}); 
     }
     else {
@@ -241,14 +258,14 @@ class Routes {
 
   }
 
-  @Router.delete("/collages/:_id")
+  @Router.delete("/collages")
   async deleteCollage(session:WebSessionDoc,_id:ObjectId) {
     const user = WebSession.getUser(session);
     await Collage.isAuthor(user,_id);
     return await Collage.delete(_id);
   }
   //CHECK idk if it is patch or post 
-  @Router.post("/collages/:_id")
+  @Router.post("/collages/:_id/content")
   async addContent(session:WebSessionDoc,_id:ObjectId, content_id:ObjectId) {
     
     const user = WebSession.getUser(session);
@@ -257,7 +274,7 @@ class Routes {
     return { msg: added.msg, collage: added.collage };
 
   }
-  @Router.delete("/collages/:_id")
+  @Router.delete("/collages/:_id/content")
   async deleteContent(session:WebSessionDoc,_id:ObjectId, content_id:ObjectId) {
     
     const user = WebSession.getUser(session);
@@ -267,11 +284,22 @@ class Routes {
 
     
   }
-  @Router.post("/collages/:_id")
-  async addEditor(session:WebSessionDoc,_id:ObjectId, editor_id:ObjectId) {
+  @Router.post("/collages/:_id/editor")
+  async addEditor(session:WebSessionDoc,_id:ObjectId, editorname:string) {
     
     const user = WebSession.getUser(session);
     await Collage.isEditor(user, _id);
+    const editor_id = (await User.getUserByUsername(editorname))._id;
+    const added = await Collage.addEditor(_id, editor_id);
+    return { msg: added.msg, collage: added.collage };
+
+  }
+  @Router.post("/collages/:_id/editor")
+  async removeEditor(session:WebSessionDoc,_id:ObjectId, editorname:string) {
+    
+    const user = WebSession.getUser(session);
+    await Collage.isAuthor(user, _id);
+    const editor_id = (await User.getUserByUsername(editorname))._id;
     const added = await Collage.addEditor(_id, editor_id);
     return { msg: added.msg, collage: added.collage };
 
@@ -282,22 +310,36 @@ class Routes {
   async createSpaces(session: WebSessionDoc,name:string, picture?:ObjectId, bio?:string) {
     
     const user = WebSession.getUser(session);
+    const featured_collage = await Collage.create(user,name,[],[user]);
+    const collage = featured_collage.collage;
+    if(!collage){
+      throw new NotFoundError(`Collage is ${collage}`);
+    }
     
-    const created = await Space.create(user,name, [user], [], [],picture, bio);
+    const created = await Space.create(user,name, [user], [], collage._id, [collage._id],picture, bio);
     return { msg: created.msg, space: created.space };
 
   }
+  @Router.patch("/space/:name")
+  async updateSpace(session: WebSessionDoc, name: string, update: Partial<SpaceDoc>) {
+    const user = WebSession.getUser(session);
+    const _id = (await Space.getSpaceBySpacename(name))._id;
+    await Space.isAuthor(user, _id);
+    return await Space.update(_id, update);
+  }
 
   @Router.get("/spaces")
-  async getSpace(_id?:ObjectId, user_id?: ObjectId,username?: string) {
+  async getSpace(authorname?: string, membername?:string, spacename?:string) {
     
-    if (_id) {
-      return await Space.getSpaces({id:_id});
-    } else if (user_id){
-      return await Space.getSpaces({author:user_id}); 
-    } else if (username){
-      const id = (await User.getUserByUsername(username))._id;
+    if (spacename) {
+      const id = (await Space.getSpaceBySpacename(spacename))._id;
+      return await Space.getSpaces({id:id});
+    } else if (authorname){
+      const id = (await User.getUserByUsername(authorname))._id;
       return await Space.getSpaces({author:id}); 
+    }else if (membername){
+      const id = (await User.getUserByUsername(membername))._id;
+      return await Space.getSpaces({members:id}); 
     }
     else {
       return await Space.getSpaces({});
@@ -312,18 +354,19 @@ class Routes {
     return await Space.delete(_id);
   }
   //CHECK idk if it is patch or post 
-  @Router.post("/spaces/:_id")
-  async joinSpace(session:WebSessionDoc,_id:ObjectId) {
-    
+  //doesnt work (prob because of my weird array hack) TODO 
+  @Router.post("/spaces/:name/join")
+  async joinSpace(session:WebSessionDoc,name:string) {
+    const _id = (await Space.getSpaceBySpacename(name))._id;
     const user = WebSession.getUser(session);
     await Space.isNotInSpace( _id,user, "user");
     const added = await Space.addItem(_id, user, "user");
     return { msg: added.msg, space: added.space };
 
   }
-  @Router.delete("/spaces/:_id")
-  async leaveSpace(session:WebSessionDoc,_id:ObjectId) {
-    
+  @Router.delete("/spaces/:name/leave")
+  async leaveSpace(session:WebSessionDoc,name:string) {
+    const _id = (await Space.getSpaceBySpacename(name))._id;
     const user = WebSession.getUser(session);
     await Space.isMember(user, _id);
     const added = await Space.deleteItem(_id, user, "user");
@@ -331,7 +374,7 @@ class Routes {
 
     
   }
-  @Router.post("/spaces/:_id")
+  @Router.post("/spaces/:_id/addItem")
   async addSpaceItem(session:WebSessionDoc,_id:ObjectId, item_id:ObjectId, item_type:string) {
     
     const user = WebSession.getUser(session);
@@ -340,7 +383,7 @@ class Routes {
     return { msg: added.msg, space: added.space };
 
   }
-  @Router.delete("/spaces/:_id")
+  @Router.delete("/spaces/:_id/deleteItem")
   async deleteSpaceItem(session:WebSessionDoc,_id:ObjectId, item_id:ObjectId, item_type:string) {
     
     const user = WebSession.getUser(session);
@@ -348,7 +391,7 @@ class Routes {
     const maybePost = await Post.getById(item_id);
     //posts should only be removed by 
     if (maybePost.length === 1){
-      const isAuthor = (Post.isAuthor(user, item_id) || Space.isAuthor(user,_id))
+      const isAuthor = (Post.isAuthor(user, item_id) || Space.isAuthor(user,_id));
       if(!isAuthor){
         throw new NotAllowedError('Not the author of post or of the space');
       }
@@ -366,7 +409,7 @@ class Routes {
     return { msg: created.msg, comment: created.comment };
 
   }
-  //TODO add support for getting by flair and id 
+  
   @Router.get("/comments")
   async getComment(author?: string, target?:ObjectId) {
     
@@ -379,13 +422,13 @@ class Routes {
       return await Comment.getComments({});
     }
   }
-  //TODO I dont want to update posts 
-  // @Router.patch("/posts/:_id")
-  // async updatePost(session: WebSessionDoc, _id: ObjectId, update: Partial<PostDoc>) {
-  //   const user = WebSession.getUser(session);
-  //   await Post.isAuthor(user, _id);
-  //   return await Post.update(_id, update);
-  // }
+  
+  @Router.patch("/comments/:_id")
+  async updateComment(session: WebSessionDoc, _id: ObjectId, update: Partial<CommentDoc>) {
+    const user = WebSession.getUser(session);
+    await Comment.isAuthor(user, _id);
+    return await Comment.update(_id, update);
+  }
   //how to delete posts from posts and groups can I just call the group router in posts
   @Router.delete("/comments/:_id")
   async deleteComment(session: WebSessionDoc, _id: ObjectId) {

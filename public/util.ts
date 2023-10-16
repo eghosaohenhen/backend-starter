@@ -60,6 +60,18 @@ const operations: operation[] = [
     method: "POST",
     fields: { content: "input", media_type: "input" },
   },
+  {
+    name: "Get Media (Media Type must be 'image', 'video', or 'text') ",
+    endpoint: "/api/media",
+    method: "GET",
+    fields: { id: "input", username: "input" },
+  },
+  {
+    name: "Delete Media",
+    endpoint: "/api/media",
+    method: "DELETE",
+    fields: { id: "input"},
+  },
   //post functions
 
   //update the post caption (later)
@@ -77,10 +89,10 @@ const operations: operation[] = [
     fields: { id: "input" },
   },
   {
-    name: "Create Post(Must provide a flair. Defined flairs are (case sensitive): 'Tip', 'Artwork', 'Inspo', 'General'",
-    endpoint: "/api/posts/:content_id/flair/:flair",
+    name: "Create Post(Must provide a flair. Defined flairs are (case sensitive): 'Tip', 'Artwork', 'Inspo', 'General')",
+    endpoint: "/api/posts/:content_id",
     method: "POST",
-    fields: { content_id: "input", flair: "input" },
+    fields: { content_id: "input", flair: "input" , caption:"input"},
   },
   
   {
@@ -101,30 +113,42 @@ const operations: operation[] = [
     name: "Get Collage (only input one or none(to get all))",
     endpoint: "/api/collages",
     method: "GET",
-    fields: { id: "input" , user_id: "input", username:"input"},
+    fields: { id: "input" , editorname: "input", username:"input"},
   },
   {
     name: "Delete Collage",
-    endpoint: "/api/collages/:id",
+    endpoint: "/api/collages",
     method: "DELETE",
     fields: { id: "input" },
   },
   {
     name: "Add Content (Post) to Collage",
-    endpoint: "/api/collages/:id",
+    endpoint: "/api/collages/:id/content",
     method: "POST",
     fields: { id: "input", content_id:"input" },
   },
   {
     name: "Remove Content (Post) from Collage",
-    endpoint: "/api/collages/:id",
+    endpoint: "/api/collages/:id/content",
     method: "DELETE",
     fields: { id: "input", content_id:"input" },
+  },
+  {
+    name: "Add Editor to Collage",
+    endpoint: "/api/collages/:id/editor",
+    method: "POST",
+    fields: { id: "input", editorname:"input" },
+  },
+  {
+    name: "Remove Editor from Collage",
+    endpoint: "/api/collages/:id/editor",
+    method: "DELETE",
+    fields: { id: "input", editorname:"input" },
   },
   //favorite actions
   {
     name: "Create Favorite from Post",
-    endpoint: "/favorites/:post_id/collage/:collage_id",
+    endpoint: "/favorites/:post_id/collages/:collage_id",
     method: "POST",
     fields: { post_id: "input", collage_id: "input" },
   },
@@ -136,14 +160,14 @@ const operations: operation[] = [
   },
   {
     name: "Delete Favorite from Post",
-    endpoint: "/favorites/:_id/collage/:collage_id",
-    method: "POST",
+    endpoint: "/favorites/:_id/collages/:collage_id",
+    method: "DELETE",
     fields: { _id: "input", collage_id: "input" },
   },
   {
     name: "Delete Favorite (Other Item: 'user', 'space', 'collage')",
     endpoint: "/favorites/:_id",
-    method: "POST",
+    method: "DELETE",
     fields: { _id: "input", item_type: "input" },
   },
   {
@@ -160,12 +184,17 @@ const operations: operation[] = [
     fields: { name: "input" },
   },
   {
-    name: "Get Space (only input one or none(to get all))",
+    name: "Get Space (only input one or none (to get all))",
     endpoint: "/api/spaces",
     method: "GET",
-    fields: { id: "input" , user_id: "input", username:"input"},
+    fields: { username:"input", membername: "input",spacename:"input"},
   },
-  
+  {
+    name: "Update Space Profile",
+    endpoint: "/api/space/:name",
+    method: "PATCH",
+    fields: { name:"input", update: { picture: "input", bio: "input", featured_collage:"input" } },
+  },
   {
     name: "Delete Space",
     endpoint: "/api/spaces/:id",
@@ -174,25 +203,25 @@ const operations: operation[] = [
   },
   {
     name: "Join Space",
-    endpoint: "/api/spaces/:id",
+    endpoint: "/api/spaces/:name/join",
     method: "POST",
-    fields: { id: "input" },
+    fields: { name: "input" },
   },
   {
     name: "Leave Space",
-    endpoint: "/api/spaces/:id",
-    method: "POST",
-    fields: { id: "input" },
+    endpoint: "/api/spaces/:name/leave",
+    method: "DELETE",
+    fields: { name: "input" },
   },
   {
     name: "Add Item ('post'/'collage') to Space",
-    endpoint: "/api/spaces/:id",
+    endpoint: "/api/spaces/:id/addItem",
     method: "POST",
     fields: { id: "input", item_id:"input", item_type:"input"},
   },
   {
     name: "Remove Item ('post'/'collage') from Space",
-    endpoint: "/api/spaces/:id",
+    endpoint: "/api/spaces/:id/deleteItem",
     method: "DELETE",
     fields: { id: "input", item_id:"input", item_type:"input"},
   },
@@ -208,6 +237,12 @@ const operations: operation[] = [
     endpoint: "/api/comments",
     method: "GET",
     fields: { username: "input" , target_id:"input"},
+  },
+  {
+    name: "Update Comment",
+    endpoint: "/api/comments/:id",
+    method: "PATCH",
+    fields: { id:"input", update: { content:"input" } },
   },
   {
     name: "Delete Comment",
